@@ -27,7 +27,7 @@ function page({ slug, title, description, body, ld }) {
 <meta name="twitter:title" content="${title}">
 <meta name="twitter:description" content="${description}">
 <meta name="twitter:image" content="${SITE}/icons/og.png">
-<meta name="theme-color" content="#0E1726">
+<meta name="theme-color" content="#0B1022">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;700;800&display=swap">
