@@ -1,0 +1,36 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "outputDirectory": "public",
+  "buildCommand": "",
+  "cleanUrls": true,
+  "functions": { "api/router.js": { "maxDuration": 20 } },
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/router?route=:path*" }
+  ],
+  "headers": [
+    {
+      "source": "/((?!endless).*)",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.adtrafficquality.google https://www.googletagservices.com https://adservice.google.com; connect-src 'self' https://*.supabase.co https://*.googlesyndication.com https://*.google.com https://*.adtrafficquality.google; img-src 'self' data: https:; frame-src https://*.googlesyndication.com https://*.doubleclick.net https://www.google.com https://*.adtrafficquality.google; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'" },
+        { "key": "X-Frame-Options", "value": "DENY" }
+      ]
+    },
+    {
+      "source": "/endless(.*)",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' https://*.crazygames.com https://game-cdn.poki.com https://*.poki.com https://*.poki-cdn.com; connect-src 'self' https://*.crazygames.com https://*.poki.com https://*.poki-cdn.com; img-src 'self' data: https:; frame-src https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; base-uri 'self'; object-src 'none'; frame-ancestors *" }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=()" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains" }
+      ]
+    },
+    { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+    { "source": "/(js|css)/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] }
+  ]
+}
