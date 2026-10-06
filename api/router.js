@@ -4,7 +4,23 @@ import * as game from '../lib/game.js';
 import * as billing from '../lib/billing.js';
 import * as admin from '../lib/admin.js';
 
+// Safe diagnostics: reports which settings exist and whether the database answers. Never returns secret values.
+async function health() {
+  const names = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'PUZZLE_SECRET', 'GUEST_SECRET', 'SITE_URL', 'ADMIN_EMAILS'];
+  const settings = Object.fromEntries(names.map((n) => [n, Boolean(process.env[n])]));
+  const url = process.env.SUPABASE_URL || '';
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  const out = { settings, supabaseHost: url.replace(/^https?:\/\//, '').split('/')[0], keyType: key.startsWith('sb_secret_') ? 'sb_secret' : key.startsWith('eyJ') ? 'jwt' : key ? 'unknown' : 'missing' };
+  try {
+    const { db } = await import('../lib/server.js');
+    const { error } = await db().from('themes').select('code').limit(1);
+    out.database = error ? `error: ${error.code || ''} ${error.message}` : 'ok';
+  } catch (e) { out.database = `exception: ${e.message}`; }
+  return out;
+}
+
 const routes = {
+  'GET health': health,
   'GET config': game.getConfig,
   'POST guest': game.createGuest,
   'GET me': game.getMe,
@@ -49,6 +65,7 @@ export default async function handler(req, res) {
   } catch (e) {
     if (e instanceof HttpError) return send(res, e.status, { error: e.message, ...(e.extra || {}) });
     console.error('Unhandled', req.method, path, e);
+    if (path === 'leaderboard' || path === 'me') console.error('detail', e?.stack);
     send(res, 500, { error: 'Something went wrong. Please try again.' });
   }
 }
