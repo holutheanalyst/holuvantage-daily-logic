@@ -60,6 +60,7 @@ create table public.attempts (
 );
 create index attempts_player on public.attempts (player_id, started_at desc);
 create index attempts_started on public.attempts (started_at);
+create index attempts_puzzle on public.attempts (puzzle_id);
 -- one daily attempt per player per puzzle
 create unique index attempts_one_daily on public.attempts (player_id, puzzle_id) where mode = 'daily';
 
@@ -82,6 +83,7 @@ create table public.scores (
 create unique index scores_one_ranked on public.scores (player_id, puzzle_id) where ranked;
 create index scores_board on public.scores (puzzle_date, difficulty, theme) where ranked;
 create index scores_player on public.scores (player_id, puzzle_date);
+create index scores_puzzle on public.scores (puzzle_id);
 
 create table public.subscriptions (
   id uuid primary key default gen_random_uuid(),
@@ -111,6 +113,7 @@ create table public.payments (
   created_at timestamptz not null default now(),
   unique (provider, provider_ref)
 );
+create index payments_player on public.payments (player_id);
 
 create table public.webhook_events (
   provider text not null,
@@ -133,12 +136,14 @@ create table public.groups (
   owner_id uuid not null references public.players(id) on delete cascade,
   created_at timestamptz not null default now()
 );
+create index groups_owner on public.groups (owner_id);
 create table public.group_members (
   group_id uuid not null references public.groups(id) on delete cascade,
   player_id uuid not null references public.players(id) on delete cascade,
   joined_at timestamptz not null default now(),
   primary key (group_id, player_id)
 );
+create index group_members_player on public.group_members (player_id);
 
 -- Share events and product analytics (only recorded with the player's analytics consent).
 create table public.analytics_events (
@@ -149,6 +154,7 @@ create table public.analytics_events (
   created_at timestamptz not null default now()
 );
 create index analytics_events_event on public.analytics_events (event, created_at);
+create index analytics_events_player on public.analytics_events (player_id);
 
 create table public.reports (
   id uuid primary key default gen_random_uuid(),
@@ -158,6 +164,8 @@ create table public.reports (
   status text not null default 'open' check (status in ('open','resolved')),
   created_at timestamptz not null default now()
 );
+create index reports_player on public.reports (player_id);
+create index reports_puzzle on public.reports (puzzle_id);
 
 -- ---------- Lock down ----------
 do $$

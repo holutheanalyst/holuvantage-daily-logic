@@ -13,7 +13,10 @@ export async function loadConfig() {
   if (config) return config;
   const t0 = Date.now();
   const res = await fetch('/api/config');
-  if (!res.ok) throw new Error('Could not reach the server.');
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({}));
+    throw new Error(res.status === 503 ? 'The daily puzzle is being set up. Please check back shortly — Endless Logic is open now.' : (b.error || 'Could not reach the server.'));
+  }
   config = await res.json();
   clockOffset = config.serverNow - Math.round((t0 + Date.now()) / 2);
   return config;
