@@ -67,3 +67,18 @@ test('score calculation', () => {
   assert.equal(computeScore({ difficulty: 'hard', timeMs: 120000, mistakes: 2, hints: 1 }), 3000 - 480 - 100 - 150);
   assert.equal(computeScore({ difficulty: 'medium', timeMs: 1e9, mistakes: 99, hints: 9 }), 200);
 });
+
+test('beginner puzzles are valid 4x4 with basic logic only', () => {
+  for (let i = 0; i < 20; i++) {
+    const p = generateValidPuzzle(`b${i}`, 'beginner');
+    assert.equal(p.n, 4); assert.ok(validatePuzzle(p).ok); assert.equal(solveLevel(p.givens, 4), 1);
+  }
+});
+
+test('hint explanations describe the deciding rule', async () => {
+  const { explainCell } = await import('../public/js/engine.js');
+  const names = { a: 'ball', b: 'flag' };
+  assert.match(explainCell([1, 1, 0, 0, ...Array(12).fill(0)], 4, 2, 2, names), /three in a row/);
+  assert.match(explainCell([1, 0, 1, 0, ...Array(12).fill(0)], 4, 1, 2, names), /between two balls/);
+  assert.match(explainCell([1, 2, 1, 0, ...Array(12).fill(0)], 4, 3, 2, names), /already has all 2 of its balls/);
+});

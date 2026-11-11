@@ -18,7 +18,7 @@ let timer = null;
 
 function header(best) {
   return `<div class="endless-head">
-    <label class="field inline">Difficulty <select data-d>${['easy', 'medium', 'hard'].map((d) => `<option value="${d}" ${d === difficulty ? 'selected' : ''}>${d[0].toUpperCase() + d.slice(1)}</option>`).join('')}</select></label>
+    <label class="field inline">Difficulty <select data-d>${['beginner', 'easy', 'medium', 'hard'].map((d) => `<option value="${d}" ${d === difficulty ? 'selected' : ''}>${d[0].toUpperCase() + d.slice(1)}</option>`).join('')}</select></label>
     <label class="field inline">Theme <select data-t>${THEME_ORDER.map((t) => `<option value="${t}" ${t === theme ? 'selected' : ''}>${THEMES[t].name}</option>`).join('')}</select></label>
     <span class="muted small">Best: ${best ? `${best} pts` : '—'} · Solved: ${store.get(`endless.solved.${difficulty}`, 0)}</span>
   </div>`;

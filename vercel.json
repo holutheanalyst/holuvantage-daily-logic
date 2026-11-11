@@ -3,6 +3,7 @@
   "outputDirectory": "public",
   "buildCommand": "",
   "cleanUrls": true,
+  "crons": [{ "path": "/api/health", "schedule": "17 6 * * *" }],
   "functions": { "api/router.js": { "maxDuration": 20 } },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/router?route=:path*" }

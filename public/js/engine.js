@@ -6,12 +6,12 @@
 //  3. No two rows are identical, and no two columns are identical.
 
 export const EMPTY = 0, A = 1, B = 2;
-export const DIFFICULTIES = ['easy', 'medium', 'hard'];
-export const SIZES = { easy: 6, medium: 8, hard: 10 };
+export const DIFFICULTIES = ['beginner', 'easy', 'medium', 'hard'];
+export const SIZES = { beginner: 4, easy: 6, medium: 8, hard: 10 };
 // Max logical level a difficulty may need: 1 = basic rules only, 2 = one-step "what if" reasoning.
-const MAX_LEVEL = { easy: 1, medium: 1, hard: 2 };
+const MAX_LEVEL = { beginner: 1, easy: 1, medium: 1, hard: 2 };
 // Minimum share of clues kept, so easy stays gentle.
-const MIN_CLUE_RATIO = { easy: 0.45, medium: 0.3, hard: 0 };
+const MIN_CLUE_RATIO = { beginner: 0.5, easy: 0.45, medium: 0.3, hard: 0 };
 
 // ---------- Seeded randomness ----------
 export function hashString(str) {
@@ -312,8 +312,8 @@ export function fingerprint(grid) {
 }
 
 // ---------- Scoring ----------
-const SCORE_BASE = { easy: 1000, medium: 2000, hard: 3000 };
-const SCORE_TIME = { easy: 2, medium: 3, hard: 4 }; // points lost per second
+const SCORE_BASE = { beginner: 500, easy: 1000, medium: 2000, hard: 3000 };
+const SCORE_TIME = { beginner: 1, easy: 2, medium: 3, hard: 4 }; // points lost per second
 export function computeScore({ difficulty, timeMs, mistakes, hints }) {
   const base = SCORE_BASE[difficulty];
   const secs = Math.max(0, Math.round(timeMs / 1000));
@@ -332,4 +332,24 @@ export function nextLogicalCell(grid, n) {
   if (!propagate(g, n)) return -1;
   for (let i = 0; i < g.length; i++) if (!grid[i] && g[i]) return i;
   return -1;
+}
+
+// Explains, in plain words, why a cell must hold `value` (used for teaching hints). Returns null if no simple reason.
+export function explainCell(grid, n, i, value, names) {
+  const other = opposite(value);
+  const one = (v) => names[v === A ? 'a' : 'b'];
+  const many = (v) => `${one(v)}s`;
+  const r = Math.floor(i / n), c = i % n;
+  const at = (rr, cc) => (rr < 0 || cc < 0 || rr >= n || cc >= n ? null : grid[rr * n + cc]);
+  for (const [dr, dc, line] of [[0, 1, 'row'], [1, 0, 'column']]) {
+    if (at(r - dr, c - dc) === other && at(r - 2 * dr, c - 2 * dc) === other) return `Two ${many(other)} sit next to it, and three in a ${line} isn't allowed, so this must be a ${one(value)}.`;
+    if (at(r + dr, c + dc) === other && at(r + 2 * dr, c + 2 * dc) === other) return `Two ${many(other)} sit next to it, and three in a ${line} isn't allowed, so this must be a ${one(value)}.`;
+    if (at(r - dr, c - dc) === other && at(r + dr, c + dc) === other) return `It sits between two ${many(other)}. A third would make three in a ${line}, so this must be a ${one(value)}.`;
+  }
+  const { rows, cols } = lines(n);
+  for (const [line, name] of [[rows[r], 'row'], [cols[c], 'column']]) {
+    const count = line.filter((k) => grid[k] === other).length;
+    if (count === n / 2) return `This ${name} already has all ${n / 2} of its ${many(other)}, so the rest must be ${many(value)}.`;
+  }
+  return null;
 }

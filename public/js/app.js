@@ -5,12 +5,13 @@ import {
   fmtTime, fmtMoney, esc, serverNow,
 } from './api.js';
 import { Board } from './board.js';
+import { explainCell } from './engine.js';
 import { THEMES, THEME_ORDER, tileSvg, applyTheme } from './themes.js';
 import { resultText, renderShare } from './share.js';
 
 const app = document.getElementById('app');
-const DIFFS = ['easy', 'medium', 'hard'];
-const DIFF_INFO = { easy: '6 × 6 · gentle', medium: '8 × 8 · steady', hard: '10 × 10 · deep thinking' };
+const DIFFS = ['beginner', 'easy', 'medium', 'hard'];
+const DIFF_INFO = { beginner: '4 × 4 · first steps', easy: '6 × 6 · gentle', medium: '8 × 8 · steady', hard: '10 × 10 · deep thinking' };
 const ACH = {
   first_solve: ['First solve', 'Completed your first daily puzzle'],
   streak_3: ['On a roll', '3 day streak'], streak_7: ['Week strong', '7 day streak'], streak_30: ['Unbreakable', '30 day streak'],
@@ -114,7 +115,7 @@ function viewOnboarding(step = 1) {
       store.set('onboarded', true);
       store.set('theme', themes.find((t) => t !== 'classic') || 'classic');
       await loadMe(true);
-      go('#/play?d=easy');
+      go(store.get('tutorialDone') ? '#/play?d=beginner' : '#/tutorial');
     } catch (e) {
       const err = qs('[data-err]'); err.textContent = e.message; err.hidden = false; ev.target.disabled = false;
     }
@@ -172,7 +173,7 @@ async function viewHome() {
     <nav class="quick card" aria-label="More">
       <a href="#/themes" class="quick-link">Choose Theme</a>
       <a href="#/leaderboard" class="quick-link">Leaderboard</a>
-      <a href="/how-to-play" class="quick-link">How to Play</a>
+      <a href="#/tutorial" class="quick-link">How to Play</a>
       <a href="#/stats" class="quick-link">My Stats</a>
       ${doneAny ? `<a href="#/play?d=${DIFFS.find((d) => status[d]?.status === 'completed')}" class="quick-link">Share Result</a>` : ''}
       <a href="#/archive" class="quick-link">Archive${me.premium ? '' : ' 🔒'}</a>
@@ -260,16 +261,13 @@ async function viewPlay(params) {
         <h1 class="play-title">${THEMES[theme].name} · ${cap(difficulty)}</h1></div>
       <dl class="play-stats">
         <div><dt>Time</dt><dd data-timer>00:00</dd></div>
-        <div><dt>Conflicts</dt><dd data-conf>0</dd></div>
+        <div><dt>Rule breaks</dt><dd data-conf>0</dd></div>
         <div><dt>Streak</dt><dd>${me?.streak.current ?? 0}</dd></div>
       </dl>
     </header>
-    <details class="rules"><summary>How to play</summary>
-      <ol><li>Fill every square with a ${esc(THEMES[theme].a.label.toLowerCase())} or a ${esc(THEMES[theme].b.label.toLowerCase())}.</li>
-      <li>Each row and column has the same number of each.</li>
-      <li>No more than two of the same tile side by side.</li>
-      <li>No two rows (or two columns) can be identical.</li></ol>
-      <p class="small muted">Tap a square to cycle tiles, or choose a tile below. Keyboard: arrows to move, 1 and 2 to place, 0 to clear, Ctrl+Z to undo. Mistakes are counted when you finish.</p>
+    <details class="rules" ${(me?.stats.completed ?? 0) < 3 ? 'open' : ''}><summary>The 3 rules</summary>
+      ${rulesHtml(theme)}
+      <p class="small muted">Tap a square to switch tiles. Stuck? Tap <strong>Hint</strong> and it explains the logic. <a href="#/tutorial">Replay the tutorial</a></p>
     </details>
     <div data-board></div>
     <div class="controls">
@@ -323,7 +321,9 @@ async function viewPlay(params) {
       const r = await api('attempt/hint', { method: 'POST', body: { attemptId: attempt.id, grid: board.grid, rewarded } });
       board.applyHint(r.hint.index, r.hint.value);
       track('hint_used', { difficulty, rewarded });
-      msg.textContent = r.hint.kind === 'fix' ? 'That highlighted tile was wrong — it’s been corrected.' : 'Here’s a tile you can work out next.';
+      const names = { a: THEMES[theme].a.label.toLowerCase(), b: THEMES[theme].b.label.toLowerCase() };
+      const why = explainCell(board.grid, puzzle.size, r.hint.index, r.hint.value, names);
+      msg.textContent = r.hint.kind === 'fix' ? 'That tile was wrong, so it’s been corrected. Check the rules for that row.' : (why ? `Hint: ${why}` : 'Here’s a tile you can work out next. Look at its row and column.');
       if (!me?.premium) hintBtn.textContent = 'Hint (0 left)';
     } catch (e) {
       msg.textContent = e.message;
@@ -663,6 +663,86 @@ async function viewAccount(params) {
   });
 }
 
+// ---------- Rules & tutorial ----------
+const mt = (theme, w) => `<span class="mt tile-${w}" aria-hidden="true">${tileSvg(theme, w, 14)}</span>`;
+function rulesHtml(theme) {
+  const a = mt(theme, 'a'), b = mt(theme, 'b');
+  return `<div class="rule-cards">
+    <div class="rule"><span class="rule-ex">${a}${b}${a}${b}</span><strong>1. Balance</strong><span>Every row and column has the same number of each tile.</span></div>
+    <div class="rule"><span class="rule-ex">${a}${a}<span class="no" aria-hidden="true">✕</span>${a}</span><strong>2. No three in a row</strong><span>Never three of the same tile side by side, across or down.</span></div>
+    <div class="rule"><span class="rule-ex">${a}${b}<span class="eq" aria-hidden="true">≠</span>${a}${b}</span><strong>3. No twins</strong><span>No two rows, and no two columns, are exactly the same.</span></div>
+  </div>`;
+}
+
+function viewTutorial() {
+  const theme = THEMES[store.get('theme')] ? store.get('theme') : 'classic';
+  applyTheme(theme);
+  const t = THEMES[theme], A1 = t.a.label.toLowerCase(), B1 = t.b.label.toLowerCase();
+  const SOL = [1, 1, 2, 2, 1, 2, 1, 2, 2, 1, 2, 1, 2, 2, 1, 1];
+  const blanks = [2, 7, 11, 8, 12, 13];
+  const givens = SOL.map((v, i) => (blanks.includes(i) ? 0 : v));
+  const steps = [
+    { cell: 2, title: 'Rule 1: No three in a row', text: `There are two ${A1}s side by side. A third one isn't allowed, so tap the glowing square to make it a ${B1}.` },
+    { cell: 7, title: 'Rule 2: Balance', text: `Each row of 4 needs two ${A1}s and two ${B1}s. This row already has its two ${A1}s, so the glowing square must be a ${B1}.` },
+    { cell: 11, title: 'It works in columns too', text: `Look down this column: two ${B1}s are stacked above. So the glowing square must be a ${A1}.` },
+    { cell: null, title: 'Your turn!', text: 'Fill the last 3 squares. Tip: count what each row and column still needs.' },
+  ];
+  let step = 0;
+  view(`<section class="card tutorial">
+    <p class="eyebrow">Quick tutorial · about 1 minute</p>
+    <h1 data-title></h1>
+    <p class="lead" data-text aria-live="polite"></p>
+    <div data-board class="tut-board"></div>
+    <p class="hint-text" data-msg role="status"></p>
+    <div class="share-row tut-actions" data-actions></div>
+    <p class="small muted"><a href="#/play?d=beginner" data-skip>Skip tutorial</a></p>
+  </section>`);
+  qs('[data-skip]').addEventListener('click', () => store.set('tutorialDone', true));
+  let allowed = new Set();
+  const board = new Board({
+    root: qs('[data-board]'), size: 4, givens, theme,
+    onChange: (grid) => {
+      const s = steps[step];
+      if (s.cell === null) return;
+      const v = grid[s.cell];
+      if (v === SOL[s.cell]) {
+        allowed = new Set(); board.paint();
+        qs('[data-msg]').textContent = 'Nice, that’s right! 🎉';
+        qs('[data-actions]').innerHTML = '<button class="btn primary" data-next>Next</button>';
+        qs('[data-next]').addEventListener('click', () => { step++; show(); });
+        qs('[data-next]').focus();
+      } else if (v) {
+        qs('[data-msg]').textContent = 'Not quite. Tap the square again to switch tiles.';
+      }
+    },
+    onSolved: () => {
+      store.set('tutorialDone', true);
+      qs('[data-skip]').hidden = true;
+      qs('[data-title]').textContent = 'You’ve got it! 🎉';
+      qs('[data-text]').textContent = 'That’s the whole game. One last rule: no two rows (or columns) can be exactly the same, though you’ll rarely need it. Each day brings a new puzzle, and Hint will always explain the logic if you get stuck.';
+      qs('[data-msg]').textContent = '';
+      qs('[data-actions]').innerHTML = '<a class="btn primary big" href="#/play?d=beginner">Play today’s Beginner puzzle</a><a class="btn" href="/endless">Practise with Endless</a>';
+    },
+  });
+  board.apply = (i, forced) => {
+    if (!allowed.has(i)) { board.say(steps[step].cell === null ? 'That square is already done.' : 'Tap the glowing square.'); if (steps[step].cell !== null) qs('[data-msg]').textContent = 'Tap the glowing square.'; return; }
+    Board.prototype.apply.call(board, i, forced);
+  };
+  const basePaint = board.paint.bind(board);
+  board.paint = () => { basePaint(); board.cells.forEach((el, i) => el.classList.toggle('target', allowed.has(i) && steps[step].cell !== null)); };
+  function show() {
+    const s = steps[step];
+    qs('[data-title]').textContent = s.title;
+    qs('[data-text]').textContent = s.text;
+    qs('[data-msg]').textContent = '';
+    qs('[data-actions]').innerHTML = '';
+    allowed = new Set(s.cell === null ? [8, 12, 13] : [s.cell]);
+    board.paint();
+    board.setFocus(s.cell === null ? 8 : s.cell, false);
+  }
+  show();
+}
+
 // ---------- Consent banner ----------
 function consentBanner() {
   if (consent()) return;
@@ -694,6 +774,7 @@ async function route() {
     else if (p === '/pricing') await viewPricing(params);
     else if (p === '/account') await viewAccount(params);
     else if (p === '/welcome') viewOnboarding(1);
+    else if (p === '/tutorial') viewTutorial();
     else go('#/');
   } catch (e) {
     console.error(e);
